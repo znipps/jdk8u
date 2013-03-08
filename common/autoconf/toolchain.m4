@@ -248,30 +248,38 @@ fi
 
 ### Locate C compiler (CC)
 
-# gcc is almost always present, but on Windows we
-# prefer cl.exe and on Solaris we prefer CC.
-# Thus test for them in this order.
-if test "x$OPENJDK_TARGET_OS" = xmacosx; then
-  # Do not probe for cc on MacOSX.
-  COMPILER_CHECK_LIST="cl gcc"
+# On windows, only cl.exe is supported.
+# On Solaris, cc is preferred to gcc.
+# Elsewhere, gcc is preferred to cc.
+
+if test "x$CC" != x; then
+  COMPILER_CHECK_LIST="$CC"
+elif test "x$OPENJDK_TARGET_OS" = "xwindows"; then
+  COMPILER_CHECK_LIST="cl"
+elif test "x$OPENJDK_TARGET_OS" = "xsolaris"; then
+  COMPILER_CHECK_LIST="cc gcc"
 else
-  COMPILER_CHECK_LIST="cl cc gcc"
+  COMPILER_CHECK_LIST="gcc cc"
 fi
 
 TOOLCHAIN_FIND_COMPILER([CC],[C],[$COMPILER_CHECK_LIST])
-# Now that we have resolved CC ourself, let autoconf have it's go at it
+# Now that we have resolved CC ourself, let autoconf have its go at it
 AC_PROG_CC([$CC])
 
 ### Locate C++ compiler (CXX)
 
-if test "x$OPENJDK_TARGET_OS" = xmacosx; then
-  # Do not probe for CC on MacOSX.
-  COMPILER_CHECK_LIST="cl g++"
+if test "x$CXX" != x; then
+  COMPILER_CHECK_LIST="$CXX"
+elif test "x$OPENJDK_TARGET_OS" = "xwindows"; then
+  COMPILER_CHECK_LIST="cl"
+elif test "x$OPENJDK_TARGET_OS" = "xsolaris"; then
+  COMPILER_CHECK_LIST="CC g++"
 else
-  COMPILER_CHECK_LIST="cl CC g++"
+  COMPILER_CHECK_LIST="g++ CC"
 fi
+
 TOOLCHAIN_FIND_COMPILER([CXX],[C++],[$COMPILER_CHECK_LIST])
-# Now that we have resolved CXX ourself, let autoconf have it's go at it
+# Now that we have resolved CXX ourself, let autoconf have its go at it
 AC_PROG_CXX([$CXX])
 
 ### Locate other tools
@@ -876,10 +884,17 @@ if test "x$OPENJDK_TARGET_OS" = xsolaris; then
 fi
 if test "x$OPENJDK_TARGET_OS" = xmacosx; then
     CCXXFLAGS_JDK="$CCXXFLAGS_JDK -DMACOSX -D_ALLBSD_SOURCE"
-    # Adding these macros will make it an error to link to mac APIs newer than OS version 10.7
-    MACOSX_REQUIRED_VERSION=1070
-    AC_SUBST(MACOSX_REQUIRED_VERSION)
-    CCXXFLAGS_JDK="$CCXXFLAGS_JDK -DMAC_OS_X_VERSION_MAX_ALLOWED=\$(MACOSX_REQUIRED_VERSION) -DMAC_OS_X_VERSION_MIN_REQUIRED=\$(MACOSX_REQUIRED_VERSION)" 
+    # Setting these parameters makes it an error to link to macosx APIs that are 
+    # newer than the given OS version and makes the linked binaries compatible even
+    # if built on a newer version of the OS.
+    # The expected format is X.Y.Z
+    MACOSX_VERSION_MIN=10.7.0
+    AC_SUBST(MACOSX_VERSION_MIN)
+    # The macro takes the version with no dots, ex: 1070
+    # Let the flags variables get resolved in make for easier override on make
+    # command line.
+    CCXXFLAGS_JDK="$CCXXFLAGS_JDK -DMAC_OS_X_VERSION_MAX_ALLOWED=\$(subst .,,\$(MACOSX_VERSION_MIN)) -mmacosx-version-min=\$(MACOSX_VERSION_MIN)"
+    LDFLAGS_JDK="$LDFLAGS_JDK -mmacosx-version-min=\$(MACOSX_VERSION_MIN)"
 fi
 if test "x$OPENJDK_TARGET_OS" = xbsd; then
     CCXXFLAGS_JDK="$CCXXFLAGS_JDK -DBSD -D_ALLBSD_SOURCE"
